@@ -1,0 +1,319 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Окно интерфейса
+local Window = Rayfield:CreateWindow({
+    Name = "MM2 Script",
+    LoadingTitle = "Murder Mystery 2 Tools",
+    LoadingSubtitle = "by ScripterMrbacon",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "MM2Config",
+        FileName = "MM2Settings"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "noinvitelink",
+        RememberJoins = true
+    },
+})
+
+-- Создание вкладок
+local MainTab = Window:CreateTab("🏠 Main")
+local PlayerTab = Window:CreateTab("🙍‍♂ Player")
+local EspTab = Window:CreateTab("🟥 Esp")
+local MiscTab = Window:CreateTab("➕ Misc")
+local TeleportTab = Window:CreateTab("🚩 Teleport")
+
+-- Сервисы
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+local RootPart = Humanoid and Humanoid.RootPart or Character:FindFirstChild("HumanoidRootPart")
+
+-- Обновление персонажа
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    Character = newChar
+    Humanoid = newChar:WaitForChildOfClass("Humanoid")
+    RootPart = Humanoid and Humanoid.RootPart or newChar:FindFirstChild("HumanoidRootPart")
+end)
+
+--[[ ВКЛАДКА MAIN ]]
+MainTab:CreateToggle({
+    Name = "Auto Grab Gun",
+    CurrentValue = false,
+    Flag = "AutoGrabGun",
+    Callback = function(Value)
+        while Value and RootPart do
+            local gun = Workspace:FindFirstChild("GunDrop", true)
+            if gun then
+                if firetouchinterest then
+                    firetouchinterest(RootPart, gun, 0)
+                    firetouchinterest(RootPart, gun, 1)
+                else
+                    gun.CFrame = RootPart.CFrame
+                end
+            end
+            task.wait(0.1)
+        end
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Grab Gun",
+    Callback = function()
+        if RootPart then
+            local gun = Workspace:FindFirstChild("GunDrop", true)
+            if gun then
+                if firetouchinterest then
+                    firetouchinterest(RootPart, gun, 0)
+                    firetouchinterest(RootPart, gun, 1)
+                else
+                    gun.CFrame = RootPart.CFrame
+                end
+            end
+        end
+    end
+})
+
+MainTab:CreateButton({
+    Name = "Steal Gun (Sheriff/Hero)",
+    Callback = function()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                if player.Character and player.Character:FindFirstChild("Gun") then
+                    player.Character.Gun.Parent = LocalPlayer.Character
+                elseif player.Backpack and player.Backpack:FindFirstChild("Gun") then
+                    player.Backpack.Gun.Parent = LocalPlayer.Backpack
+                end
+            end
+        end
+    end
+})
+
+--[[ ВКЛАДКА PLAYER ]]
+PlayerTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "Noclip",
+    Callback = function(Value)
+        if Value then
+            local connection
+            connection = RunService.Stepped:Connect(function()
+                if Character then
+                    for _, part in pairs(Character:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+            return function() connection:Disconnect() end
+        end
+    end
+})
+
+PlayerTab:CreateSlider({
+    Name = "Jump Power",
+    Range = {50, 500},
+    Increment = 5,
+    Suffix = "studs",
+    CurrentValue = 50,
+    Flag = "JumpPower",
+    Callback = function(Value)
+        if Humanoid then
+            Humanoid.JumpPower = Value
+        end
+    end
+})
+
+--[[ ВКЛАДКА ESP ]]
+EspTab:CreateToggle({
+    Name = "Gun ESP",
+    CurrentValue = false,
+    Flag = "GunESP",
+    Callback = function(Value)
+        while Value do
+            local gun = Workspace:FindFirstChild("GunDrop", true)
+            if gun then
+                if not gun:FindFirstChild("GunHighlight") then
+                    local highlight = Instance.new("Highlight")
+                    highlight.Name = "GunHighlight"
+                    highlight.FillColor = Color3.fromRGB(255, 255, 0)
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.FillTransparency = 0.4
+                    highlight.Parent = gun
+                    
+                    local billboard = Instance.new("BillboardGui")
+                    billboard.Name = "GunBillboard"
+                    billboard.Adornee = gun
+                    billboard.Size = UDim2.new(0, 100, 0, 40)
+                    billboard.AlwaysOnTop = true
+                    
+                    local label = Instance.new("TextLabel")
+                    label.Text = "GUN"
+                    label.Size = UDim2.new(1, 0, 1, 0)
+                    label.BackgroundTransparency = 1
+                    label.TextColor3 = Color3.fromRGB(255, 255, 0)
+                    label.TextStrokeTransparency = 0
+                    label.Font = Enum.Font.FredokaOne
+                    label.Parent = billboard
+                    
+                    billboard.Parent = gun
+                end
+            end
+            task.wait(0.5)
+        end
+    end
+})
+
+EspTab:CreateToggle({
+    Name = "Player Role ESP",
+    CurrentValue = false,
+    Flag = "PlayerESP",
+    Callback = function(Value)
+        local roleColors = {
+            Murderer = Color3.fromRGB(255, 0, 0),
+            Sheriff = Color3.fromRGB(0, 0, 255),
+            Hero = Color3.fromRGB(255, 255, 0),
+            Innocent = Color3.fromRGB(0, 255, 0)
+        }
+
+        while Value do
+            local data = ReplicatedStorage:FindFirstChild("GetPlayerData", true):InvokeServer()
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    local role = data[player.Name] and data[player.Name].Role or "Innocent"
+                    if not player.Character:FindFirstChild("RoleHighlight") then
+                        local highlight = Instance.new("Highlight")
+                        highlight.Name = "RoleHighlight"
+                        highlight.FillColor = roleColors[role] or Color3.fromRGB(200, 200, 200)
+                        highlight.OutlineColor = Color3.new(1, 1, 1)
+                        highlight.FillTransparency = 0.4
+                        highlight.Parent = player.Character
+                    end
+                end
+            end
+            task.wait(0.5)
+        end
+    end
+})
+
+--[[ ВКЛАДКА MISC ]]
+local playerList = {}
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        table.insert(playerList, player.Name)
+    end
+end
+
+local selectedPlayer = nil
+MiscTab:CreateDropdown({
+    Name = "Select Player",
+    Options = playerList,
+    CurrentOption = "",
+    Flag = "FlingPlayer",
+    Callback = function(Option)
+        selectedPlayer = Option
+    end
+})
+
+MiscTab:CreateButton({
+    Name = "Fling Player",
+    Callback = function()
+        if selectedPlayer then
+            local target = Players:FindFirstChild(selectedPlayer)
+            if target and target.Character and RootPart then
+                local flingForce = Instance.new("BodyVelocity")
+                flingForce.Velocity = Vector3.new(9e8, 9e8, 9e8)
+                flingForce.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                flingForce.Parent = RootPart
+                
+                local startTime = tick()
+                while tick() - startTime < 2.5 and target.Character do
+                    RootPart.CFrame = target.Character:GetPivot() * CFrame.new(0, 1.5, 0)
+                    task.wait()
+                end
+                
+                flingForce:Destroy()
+            end
+        end
+    end
+})
+
+-- Обновление списка игроков
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        table.insert(playerList, player.Name)
+        MiscTab:UpdateDropdown("FlingPlayer", playerList)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    for i, name in ipairs(playerList) do
+        if name == player.Name then
+            table.remove(playerList, i)
+            break
+        end
+    end
+    MiscTab:UpdateDropdown("FlingPlayer", playerList)
+end)
+
+--[[ ВКЛАДКА TELEPORT ]]
+TeleportTab:CreateButton({
+    Name = "Teleport to Map",
+    Callback = function()
+        local map = Workspace:FindFirstChild("CoinContainer", true)
+        if map and RootPart then
+            RootPart.CFrame = map:GetPivot() * CFrame.new(0, 2, 0)
+        end
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Teleport to Lobby",
+    Callback = function()
+        local lobby = Workspace:FindFirstChild("Lobby", true)
+        if lobby and RootPart then
+            RootPart.CFrame = lobby:GetPivot() * CFrame.new(0, 2, 0)
+        end
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Teleport to Murderer",
+    Callback = function()
+        local data = ReplicatedStorage:FindFirstChild("GetPlayerData", true):InvokeServer()
+        for plr, plrData in pairs(data) do
+            if plrData.Role == "Murderer" then
+                local target = Players:FindFirstChild(plr)
+                if target and target.Character and RootPart then
+                    RootPart.CFrame = target.Character:GetPivot() * CFrame.new(0, 0, 2)
+                end
+                break
+            end
+        end
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Teleport to Sheriff/Hero",
+    Callback = function()
+        local data = ReplicatedStorage:FindFirstChild("GetPlayerData", true):InvokeServer()
+        for plr, plrData in pairs(data) do
+            if plrData.Role == "Sheriff" or plrData.Role == "Hero" then
+                local target = Players:FindFirstChild(plr)
+                if target and target.Character and RootPart then
+                    RootPart.CFrame = target.Character:GetPivot() * CFrame.new(0, 0, 2)
+                end
+                break
+            end
+        end
+    end
+})
+
+-- Загрузка конфигурации
+Rayfield:LoadConfiguration()
