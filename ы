@@ -1,6 +1,5 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Initial notifications
 Rayfield:Notify({
    Title = "Loading Gojo Hub",
    Content = "Thanks For Using Gojo Hub!",
@@ -10,31 +9,38 @@ Rayfield:Notify({
 
 local Window = Rayfield:CreateWindow({
    Name = "Gojo Hub | MM2",
-   Icon = 0,
+   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
    LoadingTitle = "Loading Gojo Hub",
    LoadingSubtitle = "by Gojo",
-   ShowText = "GojoHub",
-   Theme = "Default",
-   ToggleUIKeybind = "K",
+   ShowText = "GojoHub", -- for mobile users to unhide rayfield, change if you'd like
+   Theme = "Default", -- Check https://docs.sirius.menu/rayfield/configuration/themes
+
+   ToggleUIKeybind = "K", -- The keybind to toggle the UI visibility (string like "K" or Enum.KeyCode)
+
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false, -- Prevents Rayfield from warning when the script has a version mismatch with the interface
+
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = nil,
+      FolderName = nil, -- Create a custom folder for your hub/game
       FileName = "Gojo Hub"
    },
+
    Discord = {
-      Enabled = false,
-      Invite = "noinvitelink",
-      RememberJoins = true
+      Enabled = false, -- Prompt the user to join your Discord server if their executor supports it
+      Invite = "noinvitelink", -- The Discord invite code, do not include discord.gg/. E.g. discord.gg/ ABCD would be ABCD
+      RememberJoins = true -- Set this to false to make them join the discord every time they load it up
    },
-   KeySystem = true,
+
+   KeySystem = true, -- Set this to true to use our key system
    KeySettings = {
       Title = "Gojo Hub | Key System",
       Subtitle = "Key Link In Discord!",
-      Note = "Key Link In DIscord!",
-      FileName = "GojoHubKey",
-      SaveKey = true,
-      GrabKeyFromSite = true,
-      Key = {"https://pastebin.com/raw/wq6T3vSV"}
+      Note = "Key Link In DIscord!", -- Use this to tell the user how to get a key
+      FileName = "GojoHubKey", -- It is recommended to use something unique as other scripts using Rayfield may overwrite your key file
+      SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
+      GrabKeyFromSite = true, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
+      Key = {"https://pastebin.com/raw/wq6T3vSV"} -- List of keys that will be accepted by the system, can be RAW file links (pastebin, github etc) or simple strings ("hello","key22")
    }
 })
 
@@ -83,12 +89,17 @@ LocalPlayer.CharacterAdded:Connect(function(newChar)
     RootPart = Humanoid.RootPart or Character:WaitForChild("HumanoidRootPart")
 end)
 
--- Create tabs
+local InfoTab = Window:CreateTab("❓Info")
 local MainTab = Window:CreateTab("🏠Main")
 local PlayerTab = Window:CreateTab("🙍‍♂Player")
 local TeleportTab = Window:CreateTab("⛳Teleport")
+local AutoFarmTab = Window:CreateTab("♻AutoFarm")
 local EspTab = Window:CreateTab("🟥Esp")
 local MiscTab = Window:CreateTab("➕Misc")
+local RolesTab = Window:CreateTab("🧏Roles")
+local SettingsTab = Window:CreateTab("⚙Settings")
+local ActivateFly,AlrActivatedFlyPC,ActivateInfiniteJump,ActiveNoclip = false,false,false,false,false,false,false,false,false,false,false,false,false
+local ParagraphInfoServer = InfoTab:CreateParagraph({Title = "Info", Content = "Loading"})
 
 -- Utility Functions
 local function getRoles()
@@ -122,189 +133,970 @@ local function getMurdererTarget()
     return nil, false
 end
 
--- ESP Section
-local ESPToggle = EspTab:CreateToggle({
-   Name = "ESP Player (Role&Name)",
-   CurrentValue = false,
-   Flag = "ESPEnabled",
-   Callback = function(Value)
-        getgenv().ESP_ENABLED = Value
-        
-        local roleColors = {
-            Murderer = Color3.fromRGB(255, 0, 0),
-            Sheriff = Color3.fromRGB(0, 0, 255),
-            Hero = Color3.fromRGB(255, 255, 0),
-            Innocent = Color3.fromRGB(0, 255, 0),
-            Default = Color3.fromRGB(200, 200, 200)
-        }
-        
-        local function clearESP()
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character then
-                    local head = player.Character:FindFirstChild("Head")
-                    if head then
-                        local esp = head:FindFirstChild("RoleESP")
-                        if esp then esp:Destroy() end
-                    end
-                    local hl = player.Character:FindFirstChild("RoleHighlight")
-                    if hl then hl:Destroy() end
-                end
+-- Roles Tab
+local rolesLabel = RolesTab:CreateLabel("Sheriff: None\nMurder: None")
+local sheriffName = "none"
+local murderName = "none"
+
+local function UpdateRoles()
+    sheriffName = "Waiting For Gun!"
+    murderName = "Waiting For Knife!"
+    
+    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+        if player.Character then
+            if player.Character:FindFirstChild("Gun") or 
+               (player.Backpack and player.Backpack:FindFirstChild("Gun")) then
+                sheriffName = player.Name
+            elseif player.Character:FindFirstChild("Knife") or 
+                  (player.Backpack and player.Backpack:FindFirstChild("Knife")) then
+                murderName = player.Name
             end
         end
+    end
+    
+    local sheriffText = "<font color='#00A2FF'>Sheriff: "..sheriffName.."</font>"
+    local murderText = "<font color='#FF0000'>Murder: "..murderName.."</font>"
+    rolesLabel:Set(sheriffText.."\n"..murderText)
+end
+
+game:GetService("RunService").Heartbeat:Connect(UpdateRoles)
+
+RolesTab:CreateButton({
+    Name = "Copy Roles",
+    Callback = function()
+        local namesToCopy = "Sheriff: "..sheriffName.."\nMurder: "..murderName.."\n<<Gojo Hub>>"
+        setclipboard(namesToCopy)
         
-        local function applyHighlight(character, role)
-            local existing = character:FindFirstChild("RoleHighlight")
-            if existing then existing:Destroy() end
-            local hl = Instance.new("Highlight")
-            hl.Name = "RoleHighlight"
-            hl.FillColor = roleColors[role] or roleColors.Default
-            hl.OutlineColor = Color3.new(1, 1, 1)
-            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            hl.FillTransparency = 0.4
-            hl.OutlineTransparency = 0
-            hl.Parent = character
+        Rayfield:Notify({
+   Title = "RolesCopied",
+   Content = "Roles Copied To Clipboard",
+   Duration = 2,
+   Image = nil,
+})
+    end,
+})
+
+RolesTab:CreateButton({
+    Name = "Send roles to chat",
+    Callback = function()
+        local message = "Sheriff: "..sheriffName.."\nMurder: "..murderName.."\n<<Gojo Hub>>"
+        
+        if game:GetService("TextChatService") then
+            local channel = game:GetService("TextChatService").TextChannels.RBXGeneral
+            if channel then
+                channel:DisplaySystemMessage(message)
+            else
+                warn("RBXGeneral channel not found!")
+            end
+        else
+            game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(message, "All")
         end
         
-        local function createBillboard(head, role, playerName)
-            local esp = Instance.new("BillboardGui")
-            esp.Name = "RoleESP"
-            esp.Adornee = head
-            esp.Size = UDim2.new(5, 0, 5, 0)
-            esp.AlwaysOnTop = true
-            esp.Parent = head
-            
-            local label = Instance.new("TextLabel")
-            label.Name = "RoleLabel"
-            label.Parent = esp
-            label.Size = UDim2.new(1, 0, 1, 0)
-            label.BackgroundTransparency = 1
-            label.TextStrokeTransparency = 0
-            label.TextSize = 14
-            label.TextColor3 = roleColors[role] or roleColors.Default
-            label.Font = Enum.Font.FredokaOne
-            label.Text = ("Role: %s • Name: %s"):format(role, playerName)
-        end
-        
-        local function updateESP()
-            local roles = getRoles()
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character then
-                    local head = player.Character:FindFirstChild("Head")
-                    if head then
+        Rayfield:Notify({
+            Title = "Roles Sented",
+            Content = "Roles Sented To Chat",
+            Duration = 2,
+            Image = nil,
+        })
+    end,
+})
+
+local Button = InfoTab:CreateButton({
+   Name = "Copy DIscord",
+   Callback = function()
+        setclipboard("https://discord.gg/7WtejdcD")
+
+            Rayfield:Notify({
+   Title = "Discord Link Copied!",
+   Content = "Discord Copied!",
+   Duration = 3,
+   Image = nil,
+})
+   end,
+})
+
+local ButtonUnloadCheat = SettingsTab:CreateButton({
+   Name = "Unload Cheat",
+   Callback = function()
+  Rayfield:Destroy()
+end,
+})
+
+local Themes = {
+   ["Default"] = "Default",
+   ["Amber Glow"] = "AmberGlow",
+   ["Amethyst"] = "Amethyst",
+   ["Bloom"] = "Bloom",
+   ["Dark Blue"] = "DarkBlue",
+   ["Green"] = "Green",
+   ["Light"] = "Light",
+   ["Ocean"] = "Ocean",
+   ["Serenity"] = "Serenity"
+}
+
+local Dropdown = SettingsTab:CreateDropdown({
+   Name = "Change Theme",
+   Options = {"Default", "Amber Glow", "Amethyst", "Bloom", "Dark Blue", "Green", "Light", "Ocean", "Serenity"},
+   CurrentOption = selectedTheme,  -- pour afficher ce qui est réellement chargé
+   Flag = "ThemeSelection",
+   Callback = function(Selected)
+      local ident = Themes[Selected[1]]
+      Window.ModifyTheme(ident)  -- <— Applique le thème en direct
+   end, 
+})
+
+local function getServerInfo()
+	local Players = game:GetService("Players")
+	local playerCount = #Players:GetPlayers()
+local maxPlayers = game:GetService("Players").MaxPlayers
+local isStudio = game:GetService("RunService"):IsStudio()
+
+	return {
+		PlaceId = game.PlaceId,
+		JobId = game.JobId,
+		IsStudio = isStudio,
+		CurrentPlayers = playerCount,
+MaxPlayers =maxPlayers
+	}
+end
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+Rayfield:LoadConfiguration()
+task.spawn(function()
+while true do
+	task.wait(1) 
+task.spawn(function()
+	local updatedInfo = getServerInfo()
+	local updatedContent = string.format(
+		"📌 PlaceId: %s\n🔑 JobId: %s\n🧪 IsStudio: %s\n👥 Players: %d/%d",
+		updatedInfo.PlaceId,
+		updatedInfo.JobId,
+		
+		tostring(updatedInfo.IsStudio),
+		updatedInfo.CurrentPlayers,
+updatedInfo.MaxPlayers
+	)
+
+	ParagraphInfoServer:Set({
+		Title = "Info",
+		Content = updatedContent
+	})
+end)
+end
+
+end)
+
+local IYMouse = Players.LocalPlayer:GetMouse()
+local FLYING = false
+local QEfly = true
+local iyflyspeed = 1
+local vehicleflyspeed = 1
+
+local function sFLY(vfly)
+	repeat wait() until Players.LocalPlayer and Players.LocalPlayer.Character and Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart") and Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+	repeat wait() until IYMouse
+	if flyKeyDown or flyKeyUp then flyKeyDown:Disconnect() flyKeyUp:Disconnect() end
+
+	local T = Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+	local CONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
+	local lCONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
+	local SPEED = 0
+
+	local function FLY()
+		FLYING = true
+		local BG = Instance.new('BodyGyro')
+		local BV = Instance.new('BodyVelocity')
+		BG.P = 9e4
+		BG.Parent = T
+		BV.Parent = T
+		BG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+		BG.CFrame = T.CFrame
+		BV.Velocity = Vector3.new(0, 0, 0)
+		BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+		task.spawn(function()
+			repeat wait()
+				if not vfly and Players.LocalPlayer.Character:FindFirstChildOfClass('Humanoid') then
+					Players.LocalPlayer.Character:FindFirstChildOfClass('Humanoid').PlatformStand = true
+				end
+				if CONTROL.L + CONTROL.R ~= 0 or CONTROL.F + CONTROL.B ~= 0 or CONTROL.Q + CONTROL.E ~= 0 then
+					SPEED = 50
+				elseif not (CONTROL.L + CONTROL.R ~= 0 or CONTROL.F + CONTROL.B ~= 0 or CONTROL.Q + CONTROL.E ~= 0) and SPEED ~= 0 then
+					SPEED = 0
+				end
+				if (CONTROL.L + CONTROL.R) ~= 0 or (CONTROL.F + CONTROL.B) ~= 0 or (CONTROL.Q + CONTROL.E) ~= 0 then
+					BV.Velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (CONTROL.F + CONTROL.B)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(CONTROL.L + CONTROL.R, (CONTROL.F + CONTROL.B + CONTROL.Q + CONTROL.E) * 0.2, 0).p) - workspace.CurrentCamera.CoordinateFrame.p)) * SPEED
+					lCONTROL = {F = CONTROL.F, B = CONTROL.B, L = CONTROL.L, R = CONTROL.R}
+				elseif (CONTROL.L + CONTROL.R) == 0 and (CONTROL.F + CONTROL.B) == 0 and (CONTROL.Q + CONTROL.E) == 0 and SPEED ~= 0 then
+					BV.Velocity = ((workspace.CurrentCamera.CoordinateFrame.lookVector * (lCONTROL.F + lCONTROL.B)) + ((workspace.CurrentCamera.CoordinateFrame * CFrame.new(lCONTROL.L + lCONTROL.R, (lCONTROL.F + lCONTROL.B + CONTROL.Q + CONTROL.E) * 0.2, 0).p) - workspace.CurrentCamera.CoordinateFrame.p)) * SPEED
+				else
+					BV.Velocity = Vector3.new(0, 0, 0)
+				end
+				BG.CFrame = workspace.CurrentCamera.CoordinateFrame
+			until not FLYING
+			CONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
+			lCONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
+			SPEED = 0
+			BG:Destroy()
+			BV:Destroy()
+			if Players.LocalPlayer.Character:FindFirstChildOfClass('Humanoid') then
+				Players.LocalPlayer.Character:FindFirstChildOfClass('Humanoid').PlatformStand = false
+			end
+		end)
+	end
+	flyKeyDown = IYMouse.KeyDown:Connect(function(KEY)
+		if KEY:lower() == 'w' then
+			CONTROL.F = (vfly and vehicleflyspeed or iyflyspeed)
+		elseif KEY:lower() == 's' then
+			CONTROL.B = - (vfly and vehicleflyspeed or iyflyspeed)
+		elseif KEY:lower() == 'a' then
+			CONTROL.L = - (vfly and vehicleflyspeed or iyflyspeed)
+		elseif KEY:lower() == 'd' then 
+			CONTROL.R = (vfly and vehicleflyspeed or iyflyspeed)
+		elseif QEfly and KEY:lower() == 'e' then
+			CONTROL.Q = (vfly and vehicleflyspeed or iyflyspeed)*2
+		elseif QEfly and KEY:lower() == 'q' then
+			CONTROL.E = -(vfly and vehicleflyspeed or iyflyspeed)*2
+		end
+		pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Track end)
+	end)
+	flyKeyUp = IYMouse.KeyUp:Connect(function(KEY)
+		if KEY:lower() == 'w' then
+			CONTROL.F = 0
+		elseif KEY:lower() == 's' then
+			CONTROL.B = 0
+		elseif KEY:lower() == 'a' then
+			CONTROL.L = 0
+		elseif KEY:lower() == 'd' then
+			CONTROL.R = 0
+		elseif KEY:lower() == 'e' then
+			CONTROL.Q = 0
+		elseif KEY:lower() == 'q' then
+			CONTROL.E = 0
+		end
+	end)
+	FLY()
+end
+
+local function NOFLY()
+	FLYING = false
+	if flyKeyDown or flyKeyUp then flyKeyDown:Disconnect() flyKeyUp:Disconnect() end
+	if Players.LocalPlayer.Character:FindFirstChildOfClass('Humanoid') then
+		Players.LocalPlayer.Character:FindFirstChildOfClass('Humanoid').PlatformStand = false
+	end
+	pcall(function() workspace.CurrentCamera.CameraType = Enum.CameraType.Custom end)
+end
+
+local velocityHandlerName = "BodyVelocity"
+local gyroHandlerName = "BodyGyro"
+local mfly1
+local mfly2
+
+local function UnMobileFly()
+	pcall(function()
+		FLYING = false
+		local root = Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+		root:FindFirstChild(velocityHandlerName):Destroy()
+		root:FindFirstChild(gyroHandlerName):Destroy()
+		Players.LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid").PlatformStand = false
+		mfly1:Disconnect()
+		mfly2:Disconnect()
+	end)
+end
+
+local function MobileFly()
+	UnMobileFly()
+	FLYING = true
+
+	local root = Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+	local camera = workspace.CurrentCamera
+	local v3none = Vector3.new()
+	local v3zero = Vector3.new(0, 0, 0)
+	local v3inf = Vector3.new(9e9, 9e9, 9e9)
+
+	local controlModule = require(Players.LocalPlayer.PlayerScripts:WaitForChild("PlayerModule"):WaitForChild("ControlModule"))
+	local bv = Instance.new("BodyVelocity")
+	bv.Name = velocityHandlerName
+	bv.Parent = root
+	bv.MaxForce = v3zero
+	bv.Velocity = v3zero
+
+	local bg = Instance.new("BodyGyro")
+	bg.Name = gyroHandlerName
+	bg.Parent = root
+	bg.MaxTorque = v3inf
+	bg.P = 1000
+	bg.D = 50
+
+	mfly1 = Players.LocalPlayer.CharacterAdded:Connect(function()
+		local bv = Instance.new("BodyVelocity")
+		bv.Name = velocityHandlerName
+		bv.Parent = root
+		bv.MaxForce = v3zero
+		bv.Velocity = v3zero
+
+		local bg = Instance.new("BodyGyro")
+		bg.Name = gyroHandlerName
+		bg.Parent = root
+		bg.MaxTorque = v3inf
+		bg.P = 1000
+		bg.D = 50
+	end)
+
+	mfly2 = RunService.RenderStepped:Connect(function()
+		root = Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+		camera = workspace.CurrentCamera
+		if Players.LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid") and root and root:FindFirstChild(velocityHandlerName) and root:FindFirstChild(gyroHandlerName) then
+			local humanoid = Players.LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+			local VelocityHandler = root:FindFirstChild(velocityHandlerName)
+			local GyroHandler = root:FindFirstChild(gyroHandlerName)
+
+			VelocityHandler.MaxForce = v3inf
+			GyroHandler.MaxTorque = v3inf
+			humanoid.PlatformStand = true
+			GyroHandler.CFrame = camera.CoordinateFrame
+			VelocityHandler.Velocity = v3none
+
+			local direction = controlModule:GetMoveVector()
+			if direction.X > 0 then
+				VelocityHandler.Velocity = VelocityHandler.Velocity + camera.CFrame.RightVector * (direction.X * ((iyflyspeed) * 50))
+			end
+			if direction.X < 0 then
+				VelocityHandler.Velocity = VelocityHandler.Velocity + camera.CFrame.RightVector * (direction.X * ((iyflyspeed) * 50))
+			end
+			if direction.Z > 0 then
+				VelocityHandler.Velocity = VelocityHandler.Velocity - camera.CFrame.LookVector * (direction.Z * ((iyflyspeed) * 50))
+			end
+			if direction.Z < 0 then
+				VelocityHandler.Velocity = VelocityHandler.Velocity - camera.CFrame.LookVector * (direction.Z * ((iyflyspeed) * 50))
+			end
+		end
+	end)
+end
+
+local PlayerFlySpeedSlider = PlayerTab:CreateSlider({
+   Name = "Fly Speed",
+   Range = {0, 10},
+   Increment = 0.1,
+   Suffix = "Fly Speed",
+   CurrentValue = 1,
+   Flag = "Slider2", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+CurrentValue = Value
+iyflyspeed = Value
+end,  iyflyspeed = CurrentValue,
+})
+
+local PlayerFlyToggle = PlayerTab:CreateToggle({
+   Name = "Fly",
+   CurrentValue = false,
+   Flag = "ButtonFly", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+  ActivateFly = Value 
+task.spawn(function()
+if not FLYING and ActivateFly then
+			if UserInputService.TouchEnabled then
+				MobileFly()
+			else
+task.spawn(function()
+if not AlrActivatedFlyPC then 
+AlrActivatedFlyPC = true
+Rayfield:Notify({
+   Title = "Fly",
+   Content = "When you enable to fly you can press F to fly/unfly (it won't disable the button!)",
+   Duration = 5,
+   Image = "rewind",
+})
+end
+end)
+				NOFLY()
+				wait()
+				sFLY()
+			end
+		elseif FLYING and not ActivateFly then
+			if UserInputService.TouchEnabled then
+				UnMobileFly()
+			else
+				NOFLY()
+			end
+		end
+end)
+end,
+})
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.F then
+		if not FLYING and ActivateFly then
+			if UserInputService.TouchEnabled then
+				MobileFly()
+			else
+				NOFLY()
+				wait()
+				sFLY()
+			end
+		elseif FLYING and ActivateFly then
+			if UserInputService.TouchEnabled then
+				UnMobileFly()
+			else
+				NOFLY()
+			end
+		end
+	end
+end)
+
+local ValueSpeed = 16
+local OldSpeed = Game.Players.LocalPlayer.Character.Humanoid.WalkSpeed
+local Slider = PlayerTab:CreateSlider({
+   Name = "Player Speed",
+   Range = {0, 100},
+   Increment = 1,
+   Suffix = "Speeds",
+   CurrentValue = 16,
+   Flag = "Slider1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+CurrentValue = Value
+ValueSpeed = Value
+end,  ValueSpeed = CurrentValue,
+})
+local PlayerActiveModifyingSpeedToggle = PlayerTab:CreateToggle({
+   Name = "Active Modifying Player Speed",
+   CurrentValue = false,
+   Flag = "ButtonSpeed", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+  ActiveSpeedBoost = Value task.spawn(function()
+while ActiveSpeedBoost do
+Game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = ValueSpeed
+task.wait(0.1)
+end
+Game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = OldSpeed
+end)
+end,
+})
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- Добавляем переключатель ESP ролей
+EspTab:CreateToggle({
+   Name = "Esp Roles",
+   CurrentValue = false,
+   Flag = "RoleESP",
+   Callback = function(Value)
+      if Value then
+         -- Включение ESP
+         if not _G.RoleESP then
+            -- Цвета для ролей
+            local roleColors = {
+               Murderer = Color3.fromRGB(255, 0, 0),
+               Sheriff = Color3.fromRGB(0, 0, 255),
+               Hero = Color3.fromRGB(255, 255, 0),
+               Innocent = Color3.fromRGB(0, 255, 0),
+               Default = Color3.fromRGB(200, 200, 200)
+            }
+
+            -- Функция получения ролей
+            local function getRoles()
+               local success, data = pcall(function()
+                  return ReplicatedStorage:FindFirstChild("GetPlayerData", true):InvokeServer()
+               end)
+               if not success then return {} end
+               
+               local roles = {}
+               for plr, plrData in pairs(data) do
+                  if not plrData.Dead then
+                     roles[plr] = plrData.Role
+                  end
+               end
+               return roles
+            end
+
+            -- Очистка ESP
+            local function clearESP()
+               for _, player in ipairs(Players:GetPlayers()) do
+                  if player.Character then
+                     local head = player.Character:FindFirstChild("Head")
+                     if head and head:FindFirstChild("RoleESP") then
+                        head.RoleESP:Destroy()
+                     end
+                     if player.Character:FindFirstChild("RoleHighlight") then
+                        player.Character.RoleHighlight:Destroy()
+                     end
+                  end
+               end
+            end
+
+            -- Создание подсветки
+            local function applyHighlight(character, role)
+               local hl = Instance.new("Highlight")
+               hl.Name = "RoleHighlight"
+               hl.FillColor = roleColors[role] or roleColors.Default
+               hl.OutlineColor = Color3.new(1, 1, 1)
+               hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+               hl.FillTransparency = 0.4
+               hl.OutlineTransparency = 0
+               hl.Parent = character
+            end
+
+            -- Создание текста с ролью
+            local function createRoleLabel(head, role)
+               local esp = Instance.new("BillboardGui")
+               esp.Name = "RoleESP"
+               esp.Adornee = head
+               esp.Size = UDim2.new(4, 0, 4, 0)
+               esp.AlwaysOnTop = true
+               esp.Parent = head
+               
+               local label = Instance.new("TextLabel")
+               label.Name = "RoleLabel"
+               label.Parent = esp
+               label.Size = UDim2.new(1, 0, 1, 0)
+               label.BackgroundTransparency = 1
+               label.TextStrokeTransparency = 0
+               label.TextSize = 14
+               label.TextColor3 = roleColors[role] or roleColors.Default
+               label.Font = Enum.Font.FredokaOne
+               label.Text = role -- Только роль без имени
+            end
+
+            -- Обновление ESP
+            local function updateESP()
+               local roles = getRoles()
+               for _, player in ipairs(Players:GetPlayers()) do
+                  if player ~= LocalPlayer and player.Character then
+                     local head = player.Character:FindFirstChild("Head")
+                     if head then
                         local role = roles[player.Name] or "Default"
+                        
+                        -- Обновляем текст роли
                         if not head:FindFirstChild("RoleESP") then
-                            createBillboard(head, role, player.Name)
+                           createRoleLabel(head, role)
                         else
-                            local label = head.RoleESP:FindFirstChild("RoleLabel")
-                            if label then
-                                label.Text = ("Role: %s • Name: %s"):format(role, player.Name)
-                                label.TextColor3 = roleColors[role] or roleColors.Default
-                            end
+                           local label = head.RoleESP.RoleLabel
+                           if label then
+                              label.Text = role
+                              label.TextColor3 = roleColors[role] or roleColors.Default
+                           end
                         end
                         
-                        local light = player.Character:FindFirstChild("RoleHighlight")
-                        if not light then
-                            applyHighlight(player.Character, role)
+                        -- Обновляем подсветку
+                        if not player.Character:FindFirstChild("RoleHighlight") then
+                           applyHighlight(player.Character, role)
                         else
-                            light.FillColor = roleColors[role] or roleColors.Default
+                           player.Character.RoleHighlight.FillColor = roleColors[role] or roleColors.Default
                         end
-                    end
-                end
+                     end
+                  end
+               end
             end
-        end
+
+            -- Запускаем обновление
+            _G.RoleESP = {
+               Connection = game:GetService("RunService").Heartbeat:Connect(function()
+                  pcall(updateESP)
+                  task.wait(0.3)
+               end),
+               
+               Disconnect = function(self)
+                  self.Connection:Disconnect()
+                  clearESP()
+               end
+            }
+         end
+      else
+         -- Отключение ESP
+         if _G.RoleESP then
+            _G.RoleESP:Disconnect()
+            _G.RoleESP = nil
+         end
+      end
+   end
+})
+
+PlayerTab:CreateToggle({
+   Name = "Infinity Jump",
+   CurrentValue = false,
+   Flag = "InfJump",
+   Callback = function(Value)
+        getgenv().InfiniteJump = Value
         
         if Value then
+            UserInputService.JumpRequest:Connect(function()
+                if getgenv().InfiniteJump and Character and Humanoid then
+                    Humanoid:ChangeState("Jumping")
+                end
+            end)
             Rayfield:Notify({
-                Title = "ESP Enabled",
-                Content = "Player ESP is now active",
+                Title = "Infinite Jump",
+                Content = "Enabled infinite jump",
                 Duration = 2,
                 Image = 4483362458
             })
-            
-            local espLoop
-            espLoop = game:GetService("RunService").Heartbeat:Connect(function()
-                if not getgenv().ESP_ENABLED then
-                    espLoop:Disconnect()
-                    clearESP()
-                    return
-                end
-                pcall(updateESP)
-            end)
-        else
-            clearESP()
         end
     end
 })
 
--- Gun ESP
-EspTab:CreateToggle({
-   Name = "ESP Gun",
+PlayerTab:CreateToggle({
+   Name = "Noclip",
    CurrentValue = false,
-   Flag = "GunESP",
+   Flag = "Noclip",
    Callback = function(Value)
-        getgenv().GunEsp = Value
-        
-        local function clearGunESP()
-            local gun = Workspace:FindFirstChild("GunDrop", true)
-            if gun then
-                if gun:FindFirstChild("GunHighlight") then
-                    gun:FindFirstChild("GunHighlight"):Destroy()
-                end
-                if gun:FindFirstChild("GunEsp") then
-                    gun:FindFirstChild("GunEsp"):Destroy()
-                end
-            end
-        end
+        getgenv().Noclip = Value
         
         if not Value then
-            clearGunESP()
+            if Character then
+                for _, part in pairs(Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                    end
+                end
+            end
             return
         end
         
-        local gunEspLoop
-        gunEspLoop = game:GetService("RunService").Heartbeat:Connect(function()
-            if not getgenv().GunEsp then
-                gunEspLoop:Disconnect()
-                clearGunESP()
+        Rayfield:Notify({
+            Title = "Noclip",
+            Content = "Enabled noclip",
+            Duration = 2,
+            Image = 4483362458
+        })
+        
+        local noclipLoop
+        noclipLoop = game:GetService("RunService").Stepped:Connect(function()
+            if not getgenv().Noclip or not Character then
+                noclipLoop:Disconnect()
                 return
             end
             
-            local gun = Workspace:FindFirstChild("GunDrop", true)
-            if gun then
-                if not gun:FindFirstChild("GunHighlight") then
-                    local gunh = Instance.new("Highlight", gun)
-                    gunh.Name = "GunHighlight"
-                    gunh.FillColor = Color3.new(1, 1, 0)
-                    gunh.OutlineColor = Color3.new(1, 1, 1)
-                    gunh.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                    gunh.FillTransparency = 0.4
-                    gunh.OutlineTransparency = 0.5
-                end
-                
-                if not gun:FindFirstChild("GunEsp") then
-                    local esp = Instance.new("BillboardGui")
-                    esp.Name = "GunEsp"
-                    esp.Adornee = gun
-                    esp.Size = UDim2.new(5, 0, 5, 0)
-                    esp.AlwaysOnTop = true
-                    esp.Parent = gun
-                    
-                    local text = Instance.new("TextLabel", esp)
-                    text.Name = "GunLabel"
-                    text.Size = UDim2.new(1, 0, 1, 0)
-                    text.BackgroundTransparency = 1
-                    text.TextStrokeTransparency = 0
-                    text.TextColor3 = Color3.fromRGB(255, 255, 0)
-                    text.Font = Enum.Font.FredokaOne
-                    text.TextSize = 16
-                    text.Text = "Gun Drop"
+            for _, part in pairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
                 end
             end
         end)
     end
 })
 
--- Gun Functions
+local JumpPowerSlider = PlayerTab:CreateSlider({
+   Name = "JumpPower",
+   Range = {50, 500},
+   Increment = 1,
+   Suffix = "power",
+   CurrentValue = 50,
+   Flag = "JumpPower",
+   Callback = function(Value)
+        if Humanoid then
+            Humanoid.JumpPower = Value
+            getgenv().Jumppower = Value
+        end
+    end
+})
+
+PlayerTab:CreateToggle({
+   Name = "Godmode",
+   CurrentValue = false,
+   Flag = "Godmode",
+   Callback = function(Value)
+        getgenv().enableGodmode = Value
+        
+        local godcon
+        local function UpdateGod()
+            if godcon then
+                godcon:Disconnect()
+                godcon = nil
+            end
+            
+            if Humanoid and getgenv().enableGodmode then
+                godcon = Humanoid.HealthChanged:Connect(function()
+                    if Humanoid.Health < Humanoid.MaxHealth then
+                        Humanoid.Health = Humanoid.MaxHealth
+                    end
+                end)
+            end
+        end
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "Godmode",
+                Content = "Enabled godmode",
+                Duration = 2,
+                Image = 4483362458
+            })
+            UpdateGod()
+            
+            LocalPlayer.CharacterAdded:Connect(function(newChar)
+                Character = newChar
+                Humanoid = Character:WaitForChildOfClass("Humanoid")
+                UpdateGod()
+            end)
+        else
+            if godcon then
+                godcon:Disconnect()
+                godcon = nil
+            end
+        end
+    end
+})
+
+TeleportTab:CreateButton({
+   Name = "Teleport To Map",
+   Callback = function()
+        local map = Workspace:FindFirstChild("CoinContainer", true)
+        if map and map.Parent then
+            local part = map:FindFirstChildWhichIsA("BasePart", true) or map.Parent:FindFirstChildWhichIsA("BasePart", true)
+            if part and part.CFrame then
+                if Character then
+                    Character:PivotTo(part.CFrame * CFrame.new(0, 2, 0))
+                elseif RootPart then
+                    RootPart.CFrame = part.CFrame * CFrame.new(0, 2, 0)
+                end
+                Rayfield:Notify({
+                    Title = "Teleported",
+                    Content = "Teleported to map",
+                    Duration = 2,
+                    Image = 4483362458
+                })
+            end
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "Map not found",
+                Duration = 2,
+                Image = 7733658504
+            })
+        end
+    end
+})
+
+TeleportTab:CreateButton({
+   Name = "Teleport To Lobby",
+   Callback = function()
+        local lobby = Workspace:FindFirstChild("Lobby", true)
+        if lobby and lobby.Parent then
+            local part = lobby:FindFirstChildWhichIsA("BasePart", true) or lobby.Parent:FindFirstChildWhichIsA("BasePart", true)
+            if part and part.CFrame then
+                if Character then
+                    Character:PivotTo(part.CFrame * CFrame.new(0, 2, 0))
+                elseif RootPart then
+                    RootPart.CFrame = part.CFrame * CFrame.new(0, 2, 0)
+                end
+                Rayfield:Notify({
+                    Title = "Teleported",
+                    Content = "Teleported to lobby",
+                    Duration = 2,
+                    Image = 4483362458
+                })
+            end
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "Lobby not found",
+                Duration = 2,
+                Image = 7733658504
+            })
+        end
+    end
+})
+
+local function SHubFling(TargetPlayer)
+    if not (Character and Humanoid and RootPart) then return end
+    local TCharacter = TargetPlayer.Character
+    if not TCharacter then return end
+    local THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
+    local TRootPart = THumanoid and THumanoid.RootPart
+    local THead = TCharacter:FindFirstChild("Head")
+    local Accessory = TCharacter:FindFirstChildOfClass("Accessory")
+    local Handle = Accessory and Accessory:FindFirstChild("Handle")
+    
+    getgenv().OldPos = RootPart.CFrame
+    Workspace.CurrentCamera.CameraSubject = THead or Handle or THumanoid
+    
+    local function FPos(BasePart, Pos, Ang)
+        local targetCF = CFrame.new(BasePart.Position) * Pos * Ang
+        RootPart.CFrame = targetCF
+        Character:SetPrimaryPartCFrame(targetCF)
+        RootPart.Velocity = Vector3.new(9e7, 9e8, 9e7)
+        RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+    end
+    
+    local function SFBasePart(BasePart)
+        local start = tick()
+        local angle = 0
+        getgenv().timeout = getgenv().timeout or 2.5
+        
+        repeat
+            if RootPart and THumanoid then
+                angle += 100
+                for _, offset in ipairs{
+                    CFrame.new(0, 1.5, 0),
+                    CFrame.new(0, -1.5, 0),
+                    CFrame.new(2.25, 1.5, -2.25),
+                    CFrame.new(-2.25, -1.5, 2.25)
+                } do
+                    FPos(BasePart, offset + THumanoid.MoveDirection, CFrame.Angles(math.rad(angle), 0, 0))
+                    task.wait()
+                end
+            end
+        until BasePart.Velocity.Magnitude > 500 or tick() - start > getgenv().timeout
+    end
+    
+    local BV = Instance.new("BodyVelocity")
+    BV.Name = "FlingVelocity"
+    BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
+    BV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    BV.Parent = RootPart
+    
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+    local target = TRootPart or THead or Handle
+    if target then SFBasePart(target) end
+    
+    BV:Destroy()
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+    Workspace.CurrentCamera.CameraSubject = Humanoid
+    
+    repeat
+        local cf = getgenv().OldPos * CFrame.new(0, .5, 0)
+        RootPart.CFrame = cf
+        Character:SetPrimaryPartCFrame(cf)
+        Humanoid:ChangeState("GettingUp")
+        
+        for _, part in ipairs(Character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.Velocity, part.RotVelocity = Vector3.zero, Vector3.zero
+            end
+        end
+        task.wait()
+    until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
+end
+
+MiscTab:CreateButton({
+   Name = "Fling Murderer",
+   Callback = function()
+        local Murderer = nil
+        for plr, role in getRoles() do
+            if role == "Murderer" then
+                Murderer = Players:FindFirstChild(plr)
+                break
+            end
+        end
+        
+        if Murderer and Murderer ~= LocalPlayer then
+            SHubFling(Murderer)
+            Rayfield:Notify({
+                Title = "Flinging Murderer",
+                Content = Murderer.Name,
+                Duration = 2,
+                Image = 4483362458
+            })
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "No murderer found",
+                Duration = 2,
+                Image = 7733658504
+            })
+        end
+    end
+})
+
+MiscTab:CreateButton({
+   Name = "Fling Sheriff/Hero",
+   Callback = function()
+        local Target = nil
+        for plr, role in getRoles() do
+            if role == "Sheriff" or role == "Hero" then
+                Target = Players:FindFirstChild(plr)
+                break
+            end
+        end
+        
+        if Target and Target ~= LocalPlayer then
+            SHubFling(Target)
+            Rayfield:Notify({
+                Title = "Flinging Sheriff/Hero",
+                Content = Target.Name,
+                Duration = 2,
+                Image = 4483362458
+            })
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "No sheriff/hero found",
+                Duration = 2,
+                Image = 7733658504
+            })
+        end
+    end
+})
+
+-- Player Selection
+local playerList = {}
+local selectedPlayer = nil
+
+local function updatePlayerList()
+    playerList = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(playerList, player.Name)
+        end
+    end
+end
+
+updatePlayerList()
+
+local PlayerDropdown = MiscTab:CreateDropdown({
+   Name = "Select Player",
+   Options = playerList,
+   CurrentOption = "",
+   Flag = "PlayerSelect",
+   Callback = function(Option)
+        selectedPlayer = Option
+    end
+})
+
+Players.PlayerAdded:Connect(function()
+    updatePlayerList()
+    PlayerDropdown:Refresh(playerList)
+end)
+
+Players.PlayerRemoving:Connect(function()
+    updatePlayerList()
+    PlayerDropdown:Refresh(playerList)
+end)
+
+MiscTab:CreateButton({
+   Name = "Fling Selected Player",
+   Callback = function()
+        if selectedPlayer then
+            local player = Players:FindFirstChild(selectedPlayer)
+            if player and player ~= LocalPlayer then
+                SHubFling(player)
+                Rayfield:Notify({
+                    Title = "Flinging Player",
+                    Content = player.Name,
+                    Duration = 2,
+                    Image = 4483362458
+                })
+            else
+                Rayfield:Notify({
+                    Title = "Error",
+                    Content = "Player not found",
+                    Duration = 2,
+                    Image = 7733658504
+                })
+            end
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "No player selected",
+                Duration = 2,
+                Image = 7733658504
+            })
+        end
+    end
+})
+
 MainTab:CreateButton({
    Name = "Grab Gun",
    Callback = function()
@@ -413,505 +1205,69 @@ MainTab:CreateButton({
     end
 })
 
--- Fling Functions
-local function SHubFling(TargetPlayer)
-    if not (Character and Humanoid and RootPart) then return end
-    local TCharacter = TargetPlayer.Character
-    if not TCharacter then return end
-    local THumanoid = TCharacter:FindFirstChildOfClass("Humanoid")
-    local TRootPart = THumanoid and THumanoid.RootPart
-    local THead = TCharacter:FindFirstChild("Head")
-    local Accessory = TCharacter:FindFirstChildOfClass("Accessory")
-    local Handle = Accessory and Accessory:FindFirstChild("Handle")
-    
-    getgenv().OldPos = RootPart.CFrame
-    Workspace.CurrentCamera.CameraSubject = THead or Handle or THumanoid
-    
-    local function FPos(BasePart, Pos, Ang)
-        local targetCF = CFrame.new(BasePart.Position) * Pos * Ang
-        RootPart.CFrame = targetCF
-        Character:SetPrimaryPartCFrame(targetCF)
-        RootPart.Velocity = Vector3.new(9e7, 9e8, 9e7)
-        RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
-    end
-    
-    local function SFBasePart(BasePart)
-        local start = tick()
-        local angle = 0
-        getgenv().timeout = getgenv().timeout or 2.5
-        
-        repeat
-            if RootPart and THumanoid then
-                angle += 100
-                for _, offset in ipairs{
-                    CFrame.new(0, 1.5, 0),
-                    CFrame.new(0, -1.5, 0),
-                    CFrame.new(2.25, 1.5, -2.25),
-                    CFrame.new(-2.25, -1.5, 2.25)
-                } do
-                    FPos(BasePart, offset + THumanoid.MoveDirection, CFrame.Angles(math.rad(angle), 0, 0))
-                    task.wait()
-                end
-            end
-        until BasePart.Velocity.Magnitude > 500 or tick() - start > getgenv().timeout
-    end
-    
-    local BV = Instance.new("BodyVelocity")
-    BV.Name = "FlingVelocity"
-    BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
-    BV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    BV.Parent = RootPart
-    
-    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-    local target = TRootPart or THead or Handle
-    if target then SFBasePart(target) end
-    
-    BV:Destroy()
-    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-    Workspace.CurrentCamera.CameraSubject = Humanoid
-    
-    repeat
-        local cf = getgenv().OldPos * CFrame.new(0, .5, 0)
-        RootPart.CFrame = cf
-        Character:SetPrimaryPartCFrame(cf)
-        Humanoid:ChangeState("GettingUp")
-        
-        for _, part in ipairs(Character:GetChildren()) do
-            if part:IsA("BasePart") then
-                part.Velocity, part.RotVelocity = Vector3.zero, Vector3.zero
-            end
-        end
-        task.wait()
-    until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
-end
-
-MainTab:CreateButton({
-   Name = "Fling Murderer",
-   Callback = function()
-        local Murderer = nil
-        for plr, role in getRoles() do
-            if role == "Murderer" then
-                Murderer = Players:FindFirstChild(plr)
-                break
-            end
-        end
-        
-        if Murderer and Murderer ~= LocalPlayer then
-            SHubFling(Murderer)
-            Rayfield:Notify({
-                Title = "Flinging Murderer",
-                Content = Murderer.Name,
-                Duration = 2,
-                Image = 4483362458
-            })
-        else
-            Rayfield:Notify({
-                Title = "Error",
-                Content = "No murderer found",
-                Duration = 2,
-                Image = 7733658504
-            })
-        end
-    end
-})
-
-MainTab:CreateButton({
-   Name = "Fling Sheriff/Hero",
-   Callback = function()
-        local Target = nil
-        for plr, role in getRoles() do
-            if role == "Sheriff" or role == "Hero" then
-                Target = Players:FindFirstChild(plr)
-                break
-            end
-        end
-        
-        if Target and Target ~= LocalPlayer then
-            SHubFling(Target)
-            Rayfield:Notify({
-                Title = "Flinging Sheriff/Hero",
-                Content = Target.Name,
-                Duration = 2,
-                Image = 4483362458
-            })
-        else
-            Rayfield:Notify({
-                Title = "Error",
-                Content = "No sheriff/hero found",
-                Duration = 2,
-                Image = 7733658504
-            })
-        end
-    end
-})
-
--- Player Selection
-local playerList = {}
-local selectedPlayer = nil
-
-local function updatePlayerList()
-    playerList = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            table.insert(playerList, player.Name)
-        end
-    end
-end
-
-updatePlayerList()
-
-local PlayerDropdown = MainTab:CreateDropdown({
-   Name = "Select Player",
-   Options = playerList,
-   CurrentOption = "",
-   Flag = "PlayerSelect",
-   Callback = function(Option)
-        selectedPlayer = Option
-    end
-})
-
-Players.PlayerAdded:Connect(function()
-    updatePlayerList()
-    PlayerDropdown:Refresh(playerList)
-end)
-
-Players.PlayerRemoving:Connect(function()
-    updatePlayerList()
-    PlayerDropdown:Refresh(playerList)
-end)
-
-MainTab:CreateButton({
-   Name = "Fling Selected Player",
-   Callback = function()
-        if selectedPlayer then
-            local player = Players:FindFirstChild(selectedPlayer)
-            if player and player ~= LocalPlayer then
-                SHubFling(player)
-                Rayfield:Notify({
-                    Title = "Flinging Player",
-                    Content = player.Name,
-                    Duration = 2,
-                    Image = 4483362458
-                })
-            else
-                Rayfield:Notify({
-                    Title = "Error",
-                    Content = "Player not found",
-                    Duration = 2,
-                    Image = 7733658504
-                })
-            end
-        else
-            Rayfield:Notify({
-                Title = "Error",
-                Content = "No player selected",
-                Duration = 2,
-                Image = 7733658504
-            })
-        end
-    end
-})
-
--- Teleport Functions
-TeleportTab:CreateButton({
-   Name = "Teleport To Map",
-   Callback = function()
-        local map = Workspace:FindFirstChild("CoinContainer", true)
-        if map and map.Parent then
-            local part = map:FindFirstChildWhichIsA("BasePart", true) or map.Parent:FindFirstChildWhichIsA("BasePart", true)
-            if part and part.CFrame then
-                if Character then
-                    Character:PivotTo(part.CFrame * CFrame.new(0, 2, 0))
-                elseif RootPart then
-                    RootPart.CFrame = part.CFrame * CFrame.new(0, 2, 0)
-                end
-                Rayfield:Notify({
-                    Title = "Teleported",
-                    Content = "Teleported to map",
-                    Duration = 2,
-                    Image = 4483362458
-                })
-            end
-        else
-            Rayfield:Notify({
-                Title = "Error",
-                Content = "Map not found",
-                Duration = 2,
-                Image = 7733658504
-            })
-        end
-    end
-})
-
-TeleportTab:CreateButton({
-   Name = "Teleport To Lobby",
-   Callback = function()
-        local lobby = Workspace:FindFirstChild("Lobby", true)
-        if lobby and lobby.Parent then
-            local part = lobby:FindFirstChildWhichIsA("BasePart", true) or lobby.Parent:FindFirstChildWhichIsA("BasePart", true)
-            if part and part.CFrame then
-                if Character then
-                    Character:PivotTo(part.CFrame * CFrame.new(0, 2, 0))
-                elseif RootPart then
-                    RootPart.CFrame = part.CFrame * CFrame.new(0, 2, 0)
-                end
-                Rayfield:Notify({
-                    Title = "Teleported",
-                    Content = "Teleported to lobby",
-                    Duration = 2,
-                    Image = 4483362458
-                })
-            end
-        else
-            Rayfield:Notify({
-                Title = "Error",
-                Content = "Lobby not found",
-                Duration = 2,
-                Image = 7733658504
-            })
-        end
-    end
-})
-
--- Player Tab Functions
-PlayerTab:CreateToggle({
-   Name = "Infinity Jump",
+EspTab:CreateToggle({
+   Name = "ESP Gun",
    CurrentValue = false,
-   Flag = "InfJump",
+   Flag = "GunESP",
    Callback = function(Value)
-        getgenv().InfiniteJump = Value
+        getgenv().GunEsp = Value
         
-        if Value then
-            UserInputService.JumpRequest:Connect(function()
-                if getgenv().InfiniteJump and Character and Humanoid then
-                    Humanoid:ChangeState("Jumping")
+        local function clearGunESP()
+            local gun = Workspace:FindFirstChild("GunDrop", true)
+            if gun then
+                if gun:FindFirstChild("GunHighlight") then
+                    gun:FindFirstChild("GunHighlight"):Destroy()
                 end
-            end)
-            Rayfield:Notify({
-                Title = "Infinite Jump",
-                Content = "Enabled infinite jump",
-                Duration = 2,
-                Image = 4483362458
-            })
+                if gun:FindFirstChild("GunEsp") then
+                    gun:FindFirstChild("GunEsp"):Destroy()
+                end
+            end
         end
-    end
-})
-
-PlayerTab:CreateToggle({
-   Name = "Noclip",
-   CurrentValue = false,
-   Flag = "Noclip",
-   Callback = function(Value)
-        getgenv().Noclip = Value
         
         if not Value then
-            if Character then
-                for _, part in pairs(Character:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = true
-                    end
-                end
-            end
+            clearGunESP()
             return
         end
         
-        Rayfield:Notify({
-            Title = "Noclip",
-            Content = "Enabled noclip",
-            Duration = 2,
-            Image = 4483362458
-        })
-        
-        local noclipLoop
-        noclipLoop = game:GetService("RunService").Stepped:Connect(function()
-            if not getgenv().Noclip or not Character then
-                noclipLoop:Disconnect()
+        local gunEspLoop
+        gunEspLoop = game:GetService("RunService").Heartbeat:Connect(function()
+            if not getgenv().GunEsp then
+                gunEspLoop:Disconnect()
+                clearGunESP()
                 return
             end
             
-            for _, part in pairs(Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
+            local gun = Workspace:FindFirstChild("GunDrop", true)
+            if gun then
+                if not gun:FindFirstChild("GunHighlight") then
+                    local gunh = Instance.new("Highlight", gun)
+                    gunh.Name = "GunHighlight"
+                    gunh.FillColor = Color3.new(1, 1, 0)
+                    gunh.OutlineColor = Color3.new(1, 1, 1)
+                    gunh.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    gunh.FillTransparency = 0.4
+                    gunh.OutlineTransparency = 0.5
+                end
+                
+                if not gun:FindFirstChild("GunEsp") then
+                    local esp = Instance.new("BillboardGui")
+                    esp.Name = "GunEsp"
+                    esp.Adornee = gun
+                    esp.Size = UDim2.new(5, 0, 5, 0)
+                    esp.AlwaysOnTop = true
+                    esp.Parent = gun
+                    
+                    local text = Instance.new("TextLabel", esp)
+                    text.Name = "GunLabel"
+                    text.Size = UDim2.new(1, 0, 1, 0)
+                    text.BackgroundTransparency = 1
+                    text.TextStrokeTransparency = 0
+                    text.TextColor3 = Color3.fromRGB(255, 255, 0)
+                    text.Font = Enum.Font.FredokaOne
+                    text.TextSize = 16
+                    text.Text = "Gun Drop"
                 end
             end
         end)
     end
-})
-
--- WalkSpeed
-local WalkSpeedSlider = PlayerTab:CreateSlider({
-   Name = "WalkSpeed",
-   Range = {16, 350},
-   Increment = 1,
-   Suffix = "studs",
-   CurrentValue = 16,
-   Flag = "WalkSpeed",
-   Callback = function(Value)
-        if Humanoid then
-            Humanoid.WalkSpeed = Value
-            getgenv().Walkspeed = Value
-        end
-    end
-})
-
-PlayerTab:CreateInput({
-   Name = "WalkSpeed Input",
-   PlaceholderText = "Enter WalkSpeed",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        local num = tonumber(Text)
-        if num then
-            if Humanoid then
-                Humanoid.WalkSpeed = num
-                getgenv().Walkspeed = num
-                WalkSpeedSlider:Set(num)
-            end
-        end
-    end
-})
-
-PlayerTab:CreateToggle({
-   Name = "Auto Set WalkSpeed",
-   CurrentValue = false,
-   Flag = "AutoWalkSpeed",
-   Callback = function(Value)
-        getgenv().KeepWalkspeed = Value
-        
-        if Value then
-            local walkLoop
-            walkLoop = game:GetService("RunService").Heartbeat:Connect(function()
-                if not getgenv().KeepWalkspeed or not Humanoid then
-                    walkLoop:Disconnect()
-                    return
-                end
-                
-                if Humanoid.WalkSpeed ~= getgenv().Walkspeed then
-                    Humanoid.WalkSpeed = getgenv().Walkspeed
-                end
-            end)
-        end
-    end
-})
-
--- JumpPower
-local JumpPowerSlider = PlayerTab:CreateSlider({
-   Name = "JumpPower",
-   Range = {50, 500},
-   Increment = 1,
-   Suffix = "power",
-   CurrentValue = 50,
-   Flag = "JumpPower",
-   Callback = function(Value)
-        if Humanoid then
-            Humanoid.JumpPower = Value
-            getgenv().Jumppower = Value
-        end
-    end
-})
-
-PlayerTab:CreateInput({
-   Name = "JumpPower Input",
-   PlaceholderText = "Enter JumpPower",
-   RemoveTextAfterFocusLost = false,
-   Callback = function(Text)
-        local num = tonumber(Text)
-        if num then
-            if Humanoid then
-                Humanoid.JumpPower = num
-                getgenv().Jumppower = num
-                JumpPowerSlider:Set(num)
-            end
-        end
-    end
-})
-
-PlayerTab:CreateToggle({
-   Name = "Auto Set JumpPower",
-   CurrentValue = false,
-   Flag = "AutoJumpPower",
-   Callback = function(Value)
-        getgenv().KeepJumppower = Value
-        
-        if Value then
-            local jumpLoop
-            jumpLoop = game:GetService("RunService").Heartbeat:Connect(function()
-                if not getgenv().KeepJumppower or not Humanoid then
-                    jumpLoop:Disconnect()
-                    return
-                end
-                
-                if Humanoid.JumpPower ~= getgenv().Jumppower then
-                    Humanoid.JumpPower = getgenv().Jumppower
-                end
-            end)
-        end
-    end
-})
-
--- Godmode
-PlayerTab:CreateToggle({
-   Name = "Godmode",
-   CurrentValue = false,
-   Flag = "Godmode",
-   Callback = function(Value)
-        getgenv().enableGodmode = Value
-        
-        local godcon
-        local function UpdateGod()
-            if godcon then
-                godcon:Disconnect()
-                godcon = nil
-            end
-            
-            if Humanoid and getgenv().enableGodmode then
-                godcon = Humanoid.HealthChanged:Connect(function()
-                    if Humanoid.Health < Humanoid.MaxHealth then
-                        Humanoid.Health = Humanoid.MaxHealth
-                    end
-                end)
-            end
-        end
-        
-        if Value then
-            Rayfield:Notify({
-                Title = "Godmode",
-                Content = "Enabled godmode",
-                Duration = 2,
-                Image = 4483362458
-            })
-            UpdateGod()
-            
-            LocalPlayer.CharacterAdded:Connect(function(newChar)
-                Character = newChar
-                Humanoid = Character:WaitForChildOfClass("Humanoid")
-                UpdateGod()
-            end)
-        else
-            if godcon then
-                godcon:Disconnect()
-                godcon = nil
-            end
-        end
-    end
-})
-
--- Fling Timeout
-MainTab:CreateSlider({
-   Name = "Fling Timeout",
-   Range = {0.5, 10},
-   Increment = 0.1,
-   Suffix = "seconds",
-   CurrentValue = 2.5,
-   Flag = "FlingTimeout",
-   Callback = function(Value)
-        getgenv().timeout = Value
-    end
-})
-
--- Initialize
-Rayfield:Notify({
-    Title = "Gojo Hub Loaded",
-    Content = "Enjoy the script!",
-    Duration = 5,
-    Image = 4483362458
 })
